@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Office Bar & Restaurant - Menú</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-gold: #d4af37;
+            --dark-bg: #1a1a1a;
+            --office-gray: #333333;
+        }
+        body { background-color: var(--dark-bg); color: #f4f4f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .gold-text { color: var(--primary-gold); }
+        .bg-gold { background-color: var(--primary-gold); }
+        .card { background: var(--office-gray); border-radius: 8px; transition: transform 0.2s; }
+        .card:hover { transform: scale(1.02); }
+        #modal-acerca { display: none; }
+    </style>
+</head>
+<body>
+
+    <header class="sticky top-0 z-50 bg-[#111] p-4 shadow-xl border-b border-[#d4af37]/30">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <img src="logo.jpg" alt="Logo" class="h-12 w-12 rounded-full border border-[#d4af37]">
+                <h1 class="text-xl font-bold gold-text uppercase tracking-widest">The Office</h1>
+            </div>
+            <nav class="flex gap-4 items-center">
+                <button onclick="toggleAcerca()" class="hover:text-[#d4af37] font-semibold">Acerca de</button>
+                <div class="bg-black/50 px-3 py-1 rounded border border-white/20 text-sm">
+                    BCV: <span id="tasa-valor" class="gold-text">Cargando...</span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4">
+        <div id="categorias-nav" class="flex gap-2 overflow-x-auto pb-4 mb-6 no-scrollbar">
+            </div>
+
+        <div id="productos-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+    </main>
+
+    <div id="cart-bar" class="fixed bottom-0 left-0 right-0 bg-black p-4 border-t border-[#d4af37] hidden">
+        <div class="container mx-auto flex justify-between items-center">
+            <div>
+                <span id="cart-count" class="font-bold text-lg">0</span> items seleccionados
+                <div class="text-sm gold-text">Total: <span id="cart-total">0.00</span> $</div>
+            </div>
+            <button onclick="confirmarPedido()" class="bg-gold text-black px-6 py-2 rounded-full font-bold hover:bg-yellow-500 transition">
+                Revisar Pedido
+            </button>
+        </div>
+    </div>
+
+    <div id="modal-pedido" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-[#222] p-6 rounded-lg w-full max-w-md border border-[#d4af37]">
+            <h2 class="text-2xl font-bold mb-4 gold-text">Tu Pedido</h2>
+            <div id="lista-pedido" class="max-h-60 overflow-y-auto mb-4 border-b border-white/10 pb-4"></div>
+            <div class="flex justify-between text-xl font-bold mb-6">
+                <span>Total:</span>
+                <span id="total-confirmar">0.00</span>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="cerrarModals()" class="flex-1 py-3 rounded bg-gray-700">Editar</button>
+                <button onclick="enviarWhatsApp()" class="flex-1 py-3 rounded bg-green-600 font-bold"><i class="fab fa-whatsapp"></i> Pedir</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-acerca" class="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4">
+        <div class="bg-[#222] p-8 rounded-lg w-full max-w-md text-center border border-[#d4af37]">
+            <img src="logo.jpg" class="h-24 w-24 mx-auto mb-4 rounded-full border-2 border-[#d4af37]">
+            <h2 class="text-2xl font-bold gold-text mb-2">Antonio Itriago</h2>
+            <p class="text-gray-400 mb-4 italic">Analista, Diseñador y Desarrollador de Sistemas de Información Computarizados</p>
+            <a href="https://wa.me/584122525407" class="inline-flex items-center gap-2 bg-green-600 px-6 py-2 rounded-full font-bold hover:bg-green-700">
+                <i class="fab fa-whatsapp text-xl"></i> Contactar al Desarrollador
+            </a>
+            <button onclick="toggleAcerca()" class="block w-full mt-6 text-sm text-gray-500 underline">Cerrar</button>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN
+        const CONFIG = {
+            SHEET_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRsTRhoswf3zopWO5PEusQsYdYglnUlWTX9HzFIvewpy4vED9fQbs9Z0V3EdQ-AGMGLlpmcs_LL_cP3/pub?gid=0&single=true&output=tsv',
+            WHATSAPP_NUMBER: '584122525407',
+            API_BCV: 'https://pydolarve.org/api/v1/dollar?page=bcv', // URL de ejemplo, ajusta según tu CONFIG
+            KEY_LAST_BCV: 'last_bcv_rate'
+        };
+
+        let productos = [];
+        let carrito = {};
+        let tasaBCV = 1;
+
+        // SERVICIO BCV (Integrado)
+        async function obtenerTasaBCV() {
+            try {
+                // Simulación o llamada real
+                const response = await fetch(CONFIG.API_BCV);
+                const data = await response.json();
+                const tasa = data.monedas.usd.promedio || 0;
+                localStorage.setItem(CONFIG.KEY_LAST_BCV, tasa);
+                return tasa;
+            } catch (error) {
+                console.error("Usando respaldo de tasa...");
+                return parseFloat(localStorage.getItem(CONFIG.KEY_LAST_BCV)) || 0;
+            }
+        }
+
+        // CARGA DE DATOS
+        async function inicializar() {
+            // Tasa
+            tasaBCV = await obtenerTasaBCV();
+            document.getElementById('tasa-valor').innerText = `${tasaBCV} Bs.`;
+
+            // Google Sheets (TSV)
+            try {
+                const res = await fetch(CONFIG.SHEET_URL);
+                const data = await res.text();
+                const rows = data.split('\n').slice(1);
+                
+                productos = rows.map(row => {
+                    const cols = row.split('\t');
+                    return {
+                        id: cols[0],
+                        name: cols[1],
+                        price: parseFloat(cols[2]),
+                        currency: cols[3],
+                        description: cols[4],
+                        category: cols[5] ? cols[5].trim() : 'General'
+                    };
+                }).filter(p => p.id);
+
+                renderCategorias();
+                renderProductos(productos);
+            } catch (e) { console.error("Error cargando productos", e); }
+        }
+
+        function renderCategorias() {
+            const cats = ['Todos', ...new Set(productos.map(p => p.category))];
+            const nav = document.getElementById('categorias-nav');
+            nav.innerHTML = cats.map(c => `
+                <button onclick="filtrar('${c}')" class="px-4 py-1 rounded-full border border-[#d4af37] text-sm whitespace-nowrap hover:bg-[#d4af37] hover:text-black transition">
+                    ${c}
+                </button>
+            `).join('');
+        }
+
+        function renderProductos(lista) {
+            const grid = document.getElementById('productos-grid');
+            grid.innerHTML = lista.map(p => `
+                <div class="card p-4 flex flex-col justify-between border border-white/5">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-lg">${p.name}</h3>
+                            <span class="gold-text font-bold">$${p.price}</span>
+                        </div>
+                        <p class="text-sm text-gray-400 mb-4">${p.description}</p>
+                        <div class="text-xs text-gray-500">Ref: ${(p.price * tasaBCV).toFixed(2)} Bs.</div>
+                    </div>
+                    <div class="mt-4 flex items-center justify-between">
+                        <div class="flex items-center gap-3 bg-black/30 rounded-lg p-1">
+                            <button onclick="cambiarCant('${p.id}', -1)" class="w-8 h-8 rounded bg-white/10">-</button>
+                            <span id="cant-${p.id}" class="font-bold w-4 text-center">0</span>
+                            <button onclick="cambiarCant('${p.id}', 1)" class="w-8 h-8 rounded bg-gold text-black font-bold">+</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function cambiarCant(id, delta) {
+            const p = productos.find(x => x.id === id);
+            if (!carrito[id]) carrito[id] = { ...p, qty: 0 };
+            
+            carrito[id].qty = Math.max(0, carrito[id].qty + delta);
+            if (carrito[id].qty === 0) delete carrito[id];
+
+            document.getElementById(`cant-${id}`).innerText = carrito[id]?.qty || 0;
+            actualizarBarraCarrito();
+        }
+
+        function actualizarBarraCarrito() {
+            const items = Object.values(carrito);
+            const totalItems = items.reduce((acc, curr) => acc + curr.qty, 0);
+            const totalPrice = items.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+
+            const bar = document.getElementById('cart-bar');
+            if (totalItems > 0) {
+                bar.classList.remove('hidden');
+                document.getElementById('cart-count').innerText = totalItems;
+                document.getElementById('cart-total').innerText = totalPrice.toFixed(2);
+            } else {
+                bar.classList.add('hidden');
+            }
+        }
+
+        function confirmarPedido() {
+            const modal = document.getElementById('modal-pedido');
+            const lista = document.getElementById('lista-pedido');
+            const items = Object.values(carrito);
+            let total = 0;
+
+            lista.innerHTML = items.map(p => {
+                total += p.price * p.qty;
+                return `
+                    <div class="flex justify-between py-2 text-sm">
+                        <span>${p.qty}x ${p.name}</span>
+                        <span>$${(p.price * p.qty).toFixed(2)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('total-confirmar').innerText = `$${total.toFixed(2)}`;
+            modal.classList.remove('hidden');
+        }
+
+        function enviarWhatsApp() {
+            const items = Object.values(carrito);
+            let totalUsd = 0;
+            let mensaje = "🏛️ *NUEVO PEDIDO - THE OFFICE*%0A%0A";
+            
+            items.forEach(p => {
+                const sub = p.price * p.qty;
+                totalUsd += sub;
+                mensaje += `▪️ ${p.qty}x ${p.name} - $${sub.toFixed(2)}%0A`;
+            });
+
+            const totalBs = (totalUsd * tasaBCV).toFixed(2);
+            mensaje += `%0A💰 *TOTAL A PAGAR:*%0A💵 USD: $${totalUsd.toFixed(2)}%0A🇻🇪 BS: ${totalBs} Bs. (Tasa: ${tasaBCV})%0A%0A_Enviado desde el Menú Digital_`;
+
+            window.open(`https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${mensaje}`, '_blank');
+        }
+
+        function filtrar(cat) {
+            if (cat === 'Todos') renderProductos(productos);
+            else renderProductos(productos.filter(p => p.category === cat));
+        }
+
+        function toggleAcerca() {
+            const m = document.getElementById('modal-acerca');
+            m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function cerrarModals() {
+            document.getElementById('modal-pedido').classList.add('hidden');
+        }
+
+        window.onload = inicializar;
+    </script>
+</body>
+</html>
